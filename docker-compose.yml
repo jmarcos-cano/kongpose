@@ -1,0 +1,41 @@
+version: "3.6"
+
+services:
+  db:
+    image:  cassandra:3
+    ports:
+      - 9042:9042
+
+  kong-migration:
+    image: "kong:latest"
+    environment:
+    - KONG_DATABASE=cassandra
+    - KONG_PG_HOST=db
+    - KONG_CASSANDRA_CONTACT_POINTS=db
+    command: [ "bash",  "-c" , "sleep 30 && kong migrations up"]
+    depends_on:
+    - db
+  kong:
+    image: "kong:latest"
+    depends_on:
+    - kong-migration
+    environment:
+    - KONG_DATABASE=postgres
+    - KONG_PG_HOST=db
+    - KONG_CASSANDRA_CONTACT_POINTS=db
+    - KONG_PROXY_ACCESS_LOG=/dev/stdout
+    - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+    - KONG_PROXY_ERROR_LOG=/dev/stderr
+    - KONG_ADMIN_ERROR_LOG=/dev/stderr
+    - KONG_ADMIN_LISTEN=0.0.0.0:8001
+    - KONG_ADMIN_LISTEN_SSL=0.0.0.0:8444
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 8001:8001
+      - 8444:8444
+    command:
+    - bash
+    - -c
+    - |
+      sleep 100 && /usr/local/openresty/nginx/sbin/nginx -c /usr/local/kong/nginx.conf -p /usr/local/kong/
